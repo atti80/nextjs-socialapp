@@ -12,6 +12,12 @@ export async function getUserById(
   return db.select().from(User).where(eq(User.id, id));
 }
 
+export async function getUserByClerkId(
+  id: SelectUser["clerkId"]
+): Promise<SelectUser[]> {
+  return db.selectDistinct().from(User).where(eq(User.clerkId, id));
+}
+
 export const getUserNames = async (): Promise<
   Array<{ username: string | null }>
 > => {
