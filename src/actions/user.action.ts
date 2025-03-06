@@ -1,9 +1,9 @@
 "use server";
 
-import { createUser } from "@/db/queries/insert";
-import { getUserByClerkId, getUserById } from "@/db/queries/select";
-import { InsertUser } from "@/db/schema";
+import { db } from "@/db/db";
+import { Follow, InsertUser, SelectUser, User } from "@/db/schema";
 import { auth, currentUser } from "@clerk/nextjs/server";
+import { getTableColumns, eq } from "drizzle-orm";
 
 export const syncUser = async () => {
   try {
@@ -13,9 +13,9 @@ export const syncUser = async () => {
     if (!userId || !user) return;
 
     const existingUser = await getUserByClerkId(userId);
-    if (existingUser.length > 0) {
+    if (existingUser) {
       console.log(
-        `syncUser(): User already exists ${existingUser[0].username}, ${existingUser[0].clerkId}`
+        `syncUser(): User already exists ${existingUser.username}, ${existingUser.clerkId}`
       );
       return;
     }
@@ -38,3 +38,35 @@ export const syncUser = async () => {
     console.log(`Error in syncUser(): ${error}`);
   }
 };
+
+export async function createUser(data: InsertUser): Promise<Array<SelectUser>> {
+  return await db.insert(User).values(data).returning();
+}
+
+export async function updateUser(
+  id: SelectUser["id"],
+  data: Partial<Omit<SelectUser, "id" | "createdAt" | "updatedAt">>
+) {
+  await db.update(User).set(data).where(eq(User.id, id));
+}
+
+export interface UserWithFollowCounts extends SelectUser {
+  followerCount: number;
+  followingCount: number;
+}
+
+export async function getUserByClerkId(
+  id: SelectUser["clerkId"]
+): Promise<UserWithFollowCounts | null> {
+  const users = await db
+    .select({
+      ...getTableColumns(User),
+      followerCount: db.$count(Follow, eq(Follow.followingId, User.id)),
+      followingCount: db.$count(Follow, eq(Follow.followerId, User.id)),
+    })
+    .from(User)
+    .where(eq(User.clerkId, id));
+
+  if (users.length === 0) return null;
+  return users[0];
+}
