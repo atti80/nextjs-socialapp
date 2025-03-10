@@ -70,3 +70,15 @@ export async function getUserByClerkId(
   if (users.length === 0) return null;
   return users[0];
 }
+
+export const getUserID = async () => {
+  const { userId } = await auth();
+
+  if (!userId) throw new Error("Unauthorized user!");
+
+  const user = await getUserByClerkId(userId);
+
+  if (!user) throw new Error("User not found!");
+
+  return user.id;
+};
