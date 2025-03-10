@@ -3,7 +3,7 @@
 import { db } from "@/db/db";
 import { Follow, InsertUser, SelectUser, User } from "@/db/schema";
 import { auth, currentUser } from "@clerk/nextjs/server";
-import { getTableColumns, eq } from "drizzle-orm";
+import { getTableColumns, eq, ne, and, or, count, isNull } from "drizzle-orm";
 
 export const syncUser = async () => {
   try {
@@ -82,3 +82,36 @@ export const getUserID = async () => {
 
   return user.id;
 };
+
+export async function getRandomUsers() {
+  try {
+    const userId = await getUserID();
+
+    if (!userId) return [];
+
+    // get 3 random users exclude ourselves & users that we already follow
+    const randomUsers = await db
+      .select({
+        id: User.id,
+        name: User.name,
+        username: User.username,
+        image: User.image,
+        count: count(Follow.followingId),
+      })
+      .from(User)
+      .leftJoin(Follow, eq(Follow.followingId, User.id))
+      .where(
+        and(
+          ne(User.id, userId),
+          or(isNull(Follow.followerId), ne(Follow.followerId, userId))
+        )
+      )
+      .groupBy(User.id, User.name, User.username, User.image)
+      .limit(3);
+
+    return randomUsers;
+  } catch (error) {
+    console.log("Error fetching random users", error);
+    return [];
+  }
+}
