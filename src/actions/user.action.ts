@@ -1,9 +1,16 @@
 "use server";
 
 import { db } from "@/db/db";
-import { Follow, InsertUser, SelectUser, User } from "@/db/schema";
+import {
+  Follow,
+  Notification,
+  InsertUser,
+  SelectUser,
+  User,
+} from "@/db/schema";
 import { auth, currentUser } from "@clerk/nextjs/server";
-import { getTableColumns, eq, ne, and, or, count, isNull } from "drizzle-orm";
+import { getTableColumns, eq, ne, and, count, notExists } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 
 export const syncUser = async () => {
   try {
@@ -103,7 +110,17 @@ export async function getRandomUsers() {
       .where(
         and(
           ne(User.id, userId),
-          or(isNull(Follow.followerId), ne(Follow.followerId, userId))
+          notExists(
+            db
+              .select()
+              .from(Follow)
+              .where(
+                and(
+                  eq(Follow.followingId, User.id),
+                  eq(Follow.followerId, userId)
+                )
+              )
+          )
         )
       )
       .groupBy(User.id, User.name, User.username, User.image)
@@ -115,3 +132,44 @@ export async function getRandomUsers() {
     return [];
   }
 }
+
+export const toggleFollow = async (followingId: number) => {
+  try {
+    const userId = await getUserID();
+    if (userId === followingId) throw new Error("You cannot follow yourself");
+
+    if (
+      (await db.$count(
+        Follow,
+        and(eq(Follow.followerId, userId), eq(Follow.followingId, followingId))
+      )) > 0
+    ) {
+      await db
+        .delete(Follow)
+        .where(
+          and(
+            eq(Follow.followerId, userId),
+            eq(Follow.followingId, followingId)
+          )
+        );
+    } else {
+      await db.transaction(async (tx) => {
+        await tx.insert(Follow).values({
+          followerId: userId,
+          followingId: followingId,
+        });
+        await tx.insert(Notification).values({
+          userId: followingId,
+          creatorId: userId,
+          type: "follow",
+        });
+      });
+    }
+
+    revalidatePath("/");
+    return { success: true };
+  } catch (error) {
+    console.error(`Failed to toggle follow: ${error}`);
+    return { success: false, error: "Failed to toggle follow" };
+  }
+};
