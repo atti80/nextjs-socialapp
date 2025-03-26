@@ -1,3 +1,4 @@
+import { relations } from "drizzle-orm";
 import {
   index,
   uniqueIndex,
@@ -9,7 +10,6 @@ import {
   unique,
   pgEnum,
   boolean,
-  primaryKey,
 } from "drizzle-orm/pg-core";
 
 // columns.helpers.ts
@@ -128,5 +128,60 @@ export const Notification = pgTable(
   (t) => [index("userId_createdAt_Idx").on(t.userId, t.createdAt)]
 );
 
+export const userRelations = relations(User, ({ many }) => ({
+  posts: many(Post),
+  comments: many(Comment),
+  likes: many(Like),
+  followers: many(Follow, { relationName: "following" }),
+  following: many(Follow, { relationName: "follower" }),
+}));
+
+export const postRelations = relations(Post, ({ one, many }) => ({
+  author: one(User, {
+    fields: [Post.authorId],
+    references: [User.id],
+  }),
+  comments: many(Comment),
+  likes: many(Like),
+}));
+
+export const commentRelations = relations(Comment, ({ one }) => ({
+  post: one(Post, {
+    fields: [Comment.postId],
+    references: [Post.id],
+  }),
+  author: one(User, {
+    fields: [Comment.authorId],
+    references: [User.id],
+  }),
+}));
+
+export const likeRelations = relations(Like, ({ one }) => ({
+  post: one(Post, {
+    fields: [Like.postId],
+    references: [Post.id],
+  }),
+  user: one(User, {
+    fields: [Like.userId],
+    references: [User.id],
+  }),
+}));
+
+export const followRelations = relations(Follow, ({ one }) => ({
+  follower: one(User, {
+    fields: [Follow.followerId],
+    references: [User.id],
+    relationName: "follower",
+  }),
+  following: one(User, {
+    fields: [Follow.followingId],
+    references: [User.id],
+    relationName: "following",
+  }),
+}));
+
 export type InsertUser = typeof User.$inferInsert;
 export type SelectUser = typeof User.$inferSelect;
+
+export type InsertPost = typeof Post.$inferInsert;
+export type SelectPost = typeof Post.$inferSelect;
