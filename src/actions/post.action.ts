@@ -1,11 +1,10 @@
 "use server";
 
-import { Post, User, Comment, Like, Notification } from "@/db/schema";
+import { Post, Comment, Like, Notification } from "@/db/schema";
 import { db } from "../db/db";
 import { getUserID } from "./user.action";
 import { revalidatePath } from "next/cache";
 import { asc, desc, eq, and } from "drizzle-orm";
-import { alias } from "drizzle-orm/pg-core";
 
 export const createPost = async (content: string, imageUrl: string) => {
   try {
@@ -35,8 +34,6 @@ export const createPost = async (content: string, imageUrl: string) => {
 
 export const getPosts = async () => {
   try {
-    const CommentAuthor = alias(User, "commentAuthor");
-
     const posts = await db.query.Post.findMany({
       orderBy: [desc(Post.createdAt)],
       with: {
