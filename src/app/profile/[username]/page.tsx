@@ -11,7 +11,7 @@ import { notFound } from "next/navigation";
 export async function generateMetadata({
   params,
 }: {
-  params: { username: string };
+  params: Promise<{ username: string }>;
 }) {
   const { username } = await params;
   const user = await getProfileByUsername(username);
@@ -23,7 +23,11 @@ export async function generateMetadata({
   };
 }
 
-async function ProfilePageServer({ params }: { params: { username: string } }) {
+async function ProfilePageServer({
+  params,
+}: {
+  params: Promise<{ username: string }>;
+}) {
   const { username } = await params;
   const user = await getProfileByUsername(username);
   if (!user) notFound();
